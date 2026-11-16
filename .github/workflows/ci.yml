@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests (macOS)
+        run: swift test
+      - name: iOS build
+        run: xcodebuild -scheme ColaySDK -destination 'generic/platform=iOS Simulator' build

@@ -1,0 +1,73 @@
+name: Release
+
+# Publishes a GitHub Release whenever a version tag (for example 0.1.3) is pushed.
+# The release notes are taken from the matching section of CHANGELOG.md.
+# The tag must match ColaySDKVersion in Sources/ColaySDK/Client.swift.
+on:
+  push:
+    tags: ["[0-9]+.[0-9]+.[0-9]+"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish or refresh (for example 0.1.2)"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+
+      - name: Check that the tag matches the SDK version
+        run: |
+          grep -q "ColaySDKVersion = \"$TAG\"" Sources/ColaySDK/Client.swift || { echo "::error::ColaySDKVersion is not $TAG"; exit 1; }
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          awk -v tag="$TAG" '
+            $0 ~ "^## \\[" tag "\\]" { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::CHANGELOG.md has no section for [$TAG]"; exit 1
+          fi
+          cat >> notes.md <<NOTES
+
+          ## Installation
+
+          Xcode → File → Add Package Dependencies… → \`https://github.com/gidysoft/colay-sdk-ios\` → Up to Next Major \`$TAG\`
+
+          \`\`\`swift
+          .package(url: "https://github.com/gidysoft/colay-sdk-ios", from: "$TAG")
+          \`\`\`
+
+          Full changelog: [CHANGELOG.md](https://github.com/gidysoft/colay-sdk-ios/blob/$TAG/CHANGELOG.md)
+          NOTES
+          cat notes.md
+
+      - name: Unit tests and iOS build
+        run: |
+          swift test
+          xcodebuild -scheme ColaySDK -destination 'generic/platform=iOS Simulator' build
+
+      - name: Create or update the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TAG" --notes-file notes.md
+          else
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md
+          fi

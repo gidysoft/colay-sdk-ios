@@ -1,0 +1,5 @@
+// Copy this file to Config.xcconfig (not committed) and enter your key.
+// Key: Dashboard → Ads → Tracking setup → iOS source (starts with "colay_pk_"; it is not a secret).
+COLAY_KEY = colay_pk_YOUR_KEY
+// "//" starts a comment in xcconfig, so the URL is split with $(). Local server in the simulator: http:/$()/localhost:5050
+COLAY_BASE_URL = https:/$()/colayai.com

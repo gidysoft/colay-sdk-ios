@@ -1,0 +1,68 @@
+# Example app project: run `xcodegen generate` to create ColayExample.xcodeproj (the project file is not committed).
+name: ColayExample
+options:
+  bundleIdPrefix: com.colayai
+  deploymentTarget:
+    iOS: "15.0"
+configFiles:
+  Debug: Config.xcconfig
+  Release: Config.xcconfig
+packages:
+  ColaySDK:
+    path: ../..          # In your own app: url: https://github.com/gidysoft/colay-sdk-ios, from: 0.1.2
+targets:
+  ColayExample:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    dependencies:
+      - package: ColaySDK
+    settings:
+      base:
+        # Enter this bundle ID as the "app ID" of the tracking source; the server verifies it.
+        PRODUCT_BUNDLE_IDENTIFIER: com.colayai.example
+        GENERATE_INFOPLIST_FILE: YES
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Colay Example
+        UILaunchScreen: {}
+        COLAY_KEY: $(COLAY_KEY)
+        COLAY_BASE_URL: $(COLAY_BASE_URL)
+        # Deep link: colayexample://campaign?utm_source=instagram&utm_campaign=winter-sale
+        CFBundleURLTypes:
+          - CFBundleURLName: com.colayai.example
+            CFBundleURLSchemes: [colayexample]
+        # Only for reaching a local server from the simulator (http://localhost:5050); use https in a real app.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+  ColayExampleTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests]
+    dependencies:
+      - target: ColayExample
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+  ColayExampleUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: ColayExample
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: ColayExample
+schemes:
+  ColayExample:
+    build:
+      targets:
+        ColayExample: all
+    test:
+      targets: [ColayExampleTests, ColayExampleUITests]
+

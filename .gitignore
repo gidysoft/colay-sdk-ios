@@ -1,0 +1,20 @@
+# Build output
+.build/
+.swiftpm/
+DerivedData/
+build/
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+
+# Local settings and keys (COLAY_KEY lives in Config.xcconfig)
+Config.xcconfig
+
+# Editor and tool files
+.idea/
+.vscode/
+.fleet/
+*.iml
+.DS_Store
+Thumbs.db
+*.swp
