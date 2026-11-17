@@ -27,7 +27,7 @@
 ## Features
 
 - **Attribution:** Apple Search Ads attribution token (no ATT required), UTM parameters and Meta / Google / TikTok click IDs, deep links.
-- **SKAdNetwork / AdAttributionKit:** conversion values via `updateConversionValue`.
+- **SKAdNetwork / AdAttributionKit:** conversion values set automatically from the schema defined on the ColayAI dashboard (or manually via `updateConversionValue`); install postback copies reported per campaign.
 - **Events:** screens (SwiftUI `.colayScreen`), standard and custom events, purchases, user identity.
 - **Automatic events:** `app_install`, `app_open`, `app_background`, `session_start`, `deeplink_open`.
 - **Reliable delivery:** persistent on-device queue, batched uploads, exponential backoff on errors.
@@ -44,11 +44,11 @@
 
 ## Installation
 
-Xcode → File → **Add Package Dependencies…** → `https://github.com/gidysoft/colay-sdk-ios` → Up to Next Major `0.1.2`.
+Xcode → File → **Add Package Dependencies…** → `https://github.com/gidysoft/colay-sdk-ios` → Up to Next Major `0.1.3`.
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/gidysoft/colay-sdk-ios", from: "0.1.2")
+.package(url: "https://github.com/gidysoft/colay-sdk-ios", from: "0.1.3")
 ```
 
 ## Quick start
@@ -82,6 +82,21 @@ Colay.purchase(149.90, currency: "USD", ["orderId": "A-1001"])
 ```
 
 UIKit: call `Colay.start` in `application(_:didFinishLaunchingWithOptions:)` and `Colay.handleDeepLink` in `scene(_:openURLContexts:)`. The publishable key (`colay_pk_…`) is not a secret: it can only send events.
+
+## SKAdNetwork
+
+1. On the ColayAI dashboard, open **Tracking setup → your iOS source → Edit**, enter the App Store ID and define
+   conversion values (for example `sign_up` → 10, `purchase` → 40).
+2. Add the ColayAI domain to your app's `Info.plist` so Apple sends ColayAI a copy of every winning install postback:
+
+   ```xml
+   <key>NSAdvertisingAttributionReportEndpoint</key>
+   <string>https://colayai.com</string>
+   ```
+
+The SDK registers the install on first launch, reads the schema (`GET /cx/v1/config`, refreshed every 12 hours) and raises
+the conversion value when a matching event is tracked. The value never decreases within a measurement window
+(days 0-2, 3-7, 8-35). Set `config.automaticConversionValue = false` if you manage conversion values yourself.
 
 ## API
 

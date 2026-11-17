@@ -3,6 +3,15 @@
 All notable changes to this project are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning: [SemVer](https://semver.org/).
 
+## [0.1.3] - 2026-11-17
+
+### Added
+- Automatic SKAdNetwork / AdAttributionKit conversion values: the SDK reads the conversion value schema defined on the
+  ColayAI dashboard (`GET /cx/v1/config`, refreshed every 12 hours) and raises the value when a matching event is tracked.
+  The value never decreases within a measurement window (days 0-2, 3-7, 8-35).
+- The install is registered for SKAdNetwork attribution on first launch.
+- `ColayConfig.automaticConversionValue` (default `true`) to turn this off when you set values yourself.
+
 ## [0.1.2] - 2026-11-17
 
 Initial public release.

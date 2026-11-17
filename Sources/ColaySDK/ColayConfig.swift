@@ -39,6 +39,10 @@ public struct ColayConfig {
     public var collectAdvertisingId: Bool = false
     /// Whether to fetch the Apple Search Ads attribution token (AdServices) on first launch (no ATT required).
     public var collectAppleSearchAdsToken: Bool = true
+    /// Update the SKAdNetwork / AdAttributionKit conversion value automatically from the schema defined on the
+    /// ColayAI dashboard (iOS source → conversion values). Also registers the install for attribution on first launch.
+    /// Turn off if you call `Colay.updateConversionValue` yourself or use another attribution SDK for this.
+    public var automaticConversionValue: Bool = true
     /// Verbose console logging.
     public var debug: Bool = false
 

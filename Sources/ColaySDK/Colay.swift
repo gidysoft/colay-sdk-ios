@@ -70,7 +70,8 @@ public enum Colay {
     }
 
     /// SKAdNetwork / AdAttributionKit conversion value (0-63), e.g. sign-up = 10, purchase = 40.
-    /// The meaning of each value is defined on the "Tracking setup" page of the ColayAI dashboard.
+    /// Usually not needed: with `ColayConfig.automaticConversionValue` (default) the SDK sets the value from the
+    /// schema defined on the "Tracking setup" page of the ColayAI dashboard.
     public static func updateConversionValue(_ fine: Int, coarse: ColayCoarseValue? = nil, lockWindow: Bool = false) {
         PlatformInfo.updateConversionValue(fine, coarse: coarse, lockWindow: lockWindow)
     }

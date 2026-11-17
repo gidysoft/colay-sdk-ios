@@ -3,7 +3,7 @@ import Foundation
 import UIKit
 #endif
 
-let ColaySDKVersion = "0.1.2"
+let ColaySDKVersion = "0.1.3"
 
 /// SDK core. All state changes happen on a single serial queue (`work`);
 /// public API calls only hand work to that queue and never block the app.
@@ -28,6 +28,7 @@ final class Client {
     private var backoffUntil: TimeInterval = 0
     private var disabled = false
     private var foregroundSince: TimeInterval = 0
+    private var skanRules: [SkanRule] = []
 
     private(set) var currentAnonymousId = ""
 
@@ -46,7 +47,10 @@ final class Client {
     // MARK: public operations
 
     func track(_ name: String, _ properties: [String: Any], revenue: Double? = nil, currency: String? = nil) {
-        work.async { self.enqueue(type: "track", name: name, properties: properties, revenue: revenue, currency: currency) }
+        work.async {
+            self.applySkan(event: name, revenue: revenue)
+            self.enqueue(type: "track", name: name, properties: properties, revenue: revenue, currency: currency)
+        }
     }
 
     func screen(_ name: String, _ properties: [String: Any]) {
@@ -133,6 +137,53 @@ final class Client {
             defaults.set(true, forKey: K.install)
             flushNow()
         }
+        setUpSkan()
+    }
+
+    // MARK: SKAdNetwork
+
+    /// Loads the cached schema, registers the install for SKAdNetwork attribution on first launch
+    /// and refreshes the schema from the server every 12 hours.
+    private func setUpSkan() {
+        guard config.automaticConversionValue else { return }
+        if let data = defaults.data(forKey: K.skanRules), let rules = Skan.parse(data) { skanRules = rules }
+        if defaults.object(forKey: K.skanInstalledAt) == nil {
+            defaults.set(Date().timeIntervalSince1970, forKey: K.skanInstalledAt)
+            defaults.set(0, forKey: K.skanWindow)
+            defaults.set(0, forKey: K.skanValue)
+            PlatformInfo.updateConversionValue(0, coarse: .low, lockWindow: false)
+            log("SKAdNetwork: install registered")
+        }
+        refreshSkanSchema()
+    }
+
+    private func refreshSkanSchema() {
+        guard config.automaticConversionValue, !disabled else { return }
+        let last = defaults.double(forKey: K.skanFetchedAt)
+        guard Date().timeIntervalSince1970 - last > 12 * 3600 else { return }
+        guard let data = transport.fetchConfig(), let rules = Skan.parse(data) else { return }
+        skanRules = rules
+        defaults.set(data, forKey: K.skanRules)
+        defaults.set(Date().timeIntervalSince1970, forKey: K.skanFetchedAt)
+        log("SKAdNetwork schema: \(rules.count) rules")
+    }
+
+    /// Raises the conversion value when a tracked event matches the schema. Works without analytics consent:
+    /// SKAdNetwork values are anonymous and never leave Apple's privacy-preserving pipeline.
+    private func applySkan(event: String, revenue: Double?) {
+        guard config.automaticConversionValue, !skanRules.isEmpty else { return }
+        let now = Date().timeIntervalSince1970
+        let installedAt = defaults.object(forKey: K.skanInstalledAt) as? TimeInterval ?? now
+        guard let window = Skan.window(installedAt: installedAt, now: now) else { return }
+        if defaults.integer(forKey: K.skanWindow) != window {
+            defaults.set(window, forKey: K.skanWindow)
+            defaults.set(-1, forKey: K.skanValue)
+        }
+        let current = defaults.object(forKey: K.skanValue) as? Int ?? -1
+        guard let rule = Skan.target(rules: skanRules, event: event, revenue: revenue, current: current) else { return }
+        defaults.set(rule.fine, forKey: K.skanValue)
+        PlatformInfo.updateConversionValue(rule.fine, coarse: rule.coarse, lockWindow: false)
+        log("SKAdNetwork value \(rule.fine) (\(event), window \(window))")
     }
 
     private func enqueue(type: String, name: String, properties: [String: Any], traits: [String: Any]? = nil,
@@ -256,6 +307,7 @@ final class Client {
             self.work.async {
                 self.foregroundSince = Date().timeIntervalSince1970
                 if self.config.trackLifecycle { self.enqueue(type: "track", name: "app_open", properties: [:]) }
+                self.refreshSkanSchema()
             }
         }
         nc.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
@@ -295,6 +347,11 @@ final class Client {
         static let install = "install_sent"
         static let consentA = "consent_analytics"
         static let consentAds = "consent_ads"
+        static let skanRules = "skan_rules"
+        static let skanFetchedAt = "skan_fetched_at"
+        static let skanInstalledAt = "skan_installed_at"
+        static let skanWindow = "skan_window"
+        static let skanValue = "skan_value"
     }
 }
 

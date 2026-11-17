@@ -85,6 +85,26 @@ X-Colay-Key: colay_pk_xxxxxxxx        (publishable key; embedded in the app, not
 | `add_to_cart`, `begin_checkout` | E-commerce steps |
 | `tutorial_complete`, `level_complete` | In-app progress |
 
+## SDK configuration (mobile only)
+
+```
+GET {baseUrl}/cx/v1/config
+X-Colay-Key: colay_pk_…
+```
+
+Returns settings for app keys (web keys get `403`). Currently the iOS SKAdNetwork conversion value schema:
+
+```json
+{ "skan": { "rules": [
+  { "event": "sign_up",  "fine": 10, "coarse": "low",  "minRevenue": null },
+  { "event": "purchase", "fine": 40, "coarse": "high", "minRevenue": null }
+] } }
+```
+
+When a tracked event matches `event` (and its revenue is at least `minRevenue`, if set), the SDK raises the conversion
+value to `fine` (0-63) with the given coarse value. The value never decreases within a measurement window.
+SDKs cache the response and refresh it at most every 12 hours.
+
 ## Responses and retries
 
 | Code | What the SDK does |

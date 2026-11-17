@@ -65,3 +65,42 @@ final class TransportTests: XCTestCase {
         XCTAssertTrue(JSONSerialization.isValidJSONObject(JSON.limit(["d": Date(), "u": URL(string: "https://a.b")!])))
     }
 }
+
+final class SkanTests: XCTestCase {
+
+    private let rules = [
+        SkanRule(event: "sign_up", fine: 10),
+        SkanRule(event: "purchase", fine: 40, coarse: .high),
+        SkanRule(event: "purchase", fine: 50, coarse: .high, minRevenue: 100),
+    ]
+
+    func testHighestMatchingRule() {
+        XCTAssertEqual(Skan.target(rules: rules, event: "sign_up", revenue: nil, current: -1)?.fine, 10)
+        XCTAssertEqual(Skan.target(rules: rules, event: "purchase", revenue: 20, current: 10)?.fine, 40)
+        XCTAssertEqual(Skan.target(rules: rules, event: "purchase", revenue: 150, current: 10)?.fine, 50)
+    }
+
+    func testValueNeverGoesDown() {
+        XCTAssertNil(Skan.target(rules: rules, event: "sign_up", revenue: nil, current: 40))
+        XCTAssertNil(Skan.target(rules: rules, event: "purchase", revenue: 20, current: 40))
+        XCTAssertNil(Skan.target(rules: rules, event: "unknown", revenue: nil, current: -1))
+    }
+
+    func testWindows() {
+        let day: TimeInterval = 86_400
+        XCTAssertEqual(Skan.window(installedAt: 0, now: day), 0)
+        XCTAssertEqual(Skan.window(installedAt: 0, now: 3 * day), 1)
+        XCTAssertEqual(Skan.window(installedAt: 0, now: 10 * day), 2)
+        XCTAssertNil(Skan.window(installedAt: 0, now: 40 * day))
+    }
+
+    func testParseServerSchema() {
+        let json = #"{"skan":{"rules":[{"event":"sign_up","fine":10,"coarse":"low"},{"event":"purchase","fine":70,"coarse":"high","minRevenue":5},{"fine":3}]}}"#
+        let parsed = Skan.parse(Data(json.utf8))
+        XCTAssertEqual(parsed?.count, 2)
+        XCTAssertEqual(parsed?[1].fine, 63)
+        XCTAssertEqual(parsed?[1].coarse, .high)
+        XCTAssertEqual(parsed?[1].minRevenue, 5)
+        XCTAssertNil(Skan.parse(Data("{}".utf8)))
+    }
+}

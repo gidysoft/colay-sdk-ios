@@ -21,11 +21,13 @@ enum SendResult: Equatable {
 
 final class Transport {
     private let endpoint: URL
+    private let configEndpoint: URL
     private let key: String
     private let session: URLSession
 
     init(baseURL: URL, key: String) {
         endpoint = baseURL.appendingPathComponent("cx/v1/batch")
+        configEndpoint = baseURL.appendingPathComponent("cx/v1/config")
         self.key = key
         let cfg = URLSessionConfiguration.ephemeral
         cfg.timeoutIntervalForRequest = 15
@@ -52,5 +54,22 @@ final class Transport {
         }.resume()
         _ = sem.wait(timeout: .now() + 35)
         return result
+    }
+
+    /// SDK settings from the server (SKAdNetwork schema). Synchronous, on the SDK's serial queue. nil on failure.
+    func fetchConfig() -> Data? {
+        var req = URLRequest(url: configEndpoint)
+        req.httpMethod = "GET"
+        req.setValue(key, forHTTPHeaderField: "X-Colay-Key")
+        req.setValue("colay-ios/\(ColaySDKVersion)", forHTTPHeaderField: "User-Agent")
+
+        let sem = DispatchSemaphore(value: 0)
+        var out: Data?
+        session.dataTask(with: req) { data, response, error in
+            if error == nil, let http = response as? HTTPURLResponse, http.statusCode == 200 { out = data }
+            sem.signal()
+        }.resume()
+        _ = sem.wait(timeout: .now() + 20)
+        return out
     }
 }
