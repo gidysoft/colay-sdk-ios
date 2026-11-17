@@ -3,7 +3,7 @@ import Foundation
 import UIKit
 #endif
 
-let ColaySDKVersion = "0.1.3"
+let ColaySDKVersion = "0.1.4"
 
 /// SDK core. All state changes happen on a single serial queue (`work`);
 /// public API calls only hand work to that queue and never block the app.
@@ -29,6 +29,7 @@ final class Client {
     private var disabled = false
     private var foregroundSince: TimeInterval = 0
     private var skanRules: [SkanRule] = []
+    private var skanFetching = false
 
     private(set) var currentAnonymousId = ""
 
@@ -157,15 +158,26 @@ final class Client {
         refreshSkanSchema()
     }
 
+    /// Fetches the schema at most every 12 hours; after a failure it waits an hour before trying again.
+    /// The request runs in the background and its result is applied on the SDK queue.
     private func refreshSkanSchema() {
-        guard config.automaticConversionValue, !disabled else { return }
-        let last = defaults.double(forKey: K.skanFetchedAt)
-        guard Date().timeIntervalSince1970 - last > 12 * 3600 else { return }
-        guard let data = transport.fetchConfig(), let rules = Skan.parse(data) else { return }
-        skanRules = rules
-        defaults.set(data, forKey: K.skanRules)
-        defaults.set(Date().timeIntervalSince1970, forKey: K.skanFetchedAt)
-        log("SKAdNetwork schema: \(rules.count) rules")
+        guard config.automaticConversionValue, !disabled, !skanFetching else { return }
+        let now = Date().timeIntervalSince1970
+        guard now - defaults.double(forKey: K.skanFetchedAt) > 12 * 3600,
+              now - defaults.double(forKey: K.skanAttemptAt) > 3600 else { return }
+        skanFetching = true
+        defaults.set(now, forKey: K.skanAttemptAt)
+        transport.fetchConfig { [weak self] data in
+            guard let self else { return }
+            self.work.async {
+                self.skanFetching = false
+                guard let data, let rules = Skan.parse(data) else { self.log("SKAdNetwork schema fetch failed"); return }
+                self.skanRules = rules
+                self.defaults.set(data, forKey: K.skanRules)
+                self.defaults.set(Date().timeIntervalSince1970, forKey: K.skanFetchedAt)
+                self.log("SKAdNetwork schema: \(rules.count) rules")
+            }
+        }
     }
 
     /// Raises the conversion value when a tracked event matches the schema. Works without analytics consent:
@@ -178,11 +190,15 @@ final class Client {
         if defaults.integer(forKey: K.skanWindow) != window {
             defaults.set(window, forKey: K.skanWindow)
             defaults.set(-1, forKey: K.skanValue)
+            defaults.set(-1, forKey: K.skanCoarse)
         }
         let current = defaults.object(forKey: K.skanValue) as? Int ?? -1
         guard let rule = Skan.target(rules: skanRules, event: event, revenue: revenue, current: current) else { return }
+        // The coarse value never goes down within a window either (later windows report only the coarse value)
+        let coarse = Skan.maxCoarse(rule.coarse, previous: defaults.object(forKey: K.skanCoarse) as? Int ?? -1)
         defaults.set(rule.fine, forKey: K.skanValue)
-        PlatformInfo.updateConversionValue(rule.fine, coarse: rule.coarse, lockWindow: false)
+        defaults.set(Skan.rank(coarse), forKey: K.skanCoarse)
+        PlatformInfo.updateConversionValue(rule.fine, coarse: coarse, lockWindow: false)
         log("SKAdNetwork value \(rule.fine) (\(event), window \(window))")
     }
 
@@ -352,6 +368,8 @@ final class Client {
         static let skanInstalledAt = "skan_installed_at"
         static let skanWindow = "skan_window"
         static let skanValue = "skan_value"
+        static let skanCoarse = "skan_coarse"
+        static let skanAttemptAt = "skan_attempt_at"
     }
 }
 

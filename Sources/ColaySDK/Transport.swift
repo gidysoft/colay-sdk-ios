@@ -56,20 +56,16 @@ final class Transport {
         return result
     }
 
-    /// SDK settings from the server (SKAdNetwork schema). Synchronous, on the SDK's serial queue. nil on failure.
-    func fetchConfig() -> Data? {
+    /// SDK settings from the server (SKAdNetwork schema). Asynchronous: never blocks the SDK queue. nil on failure.
+    func fetchConfig(completion: @escaping (Data?) -> Void) {
         var req = URLRequest(url: configEndpoint)
         req.httpMethod = "GET"
+        req.timeoutInterval = 15
         req.setValue(key, forHTTPHeaderField: "X-Colay-Key")
         req.setValue("colay-ios/\(ColaySDKVersion)", forHTTPHeaderField: "User-Agent")
-
-        let sem = DispatchSemaphore(value: 0)
-        var out: Data?
         session.dataTask(with: req) { data, response, error in
-            if error == nil, let http = response as? HTTPURLResponse, http.statusCode == 200 { out = data }
-            sem.signal()
+            if error == nil, let http = response as? HTTPURLResponse, http.statusCode == 200 { completion(data) }
+            else { completion(nil) }
         }.resume()
-        _ = sem.wait(timeout: .now() + 20)
-        return out
     }
 }

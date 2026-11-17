@@ -94,6 +94,13 @@ final class SkanTests: XCTestCase {
         XCTAssertNil(Skan.window(installedAt: 0, now: 40 * day))
     }
 
+    func testCoarseNeverGoesDown() {
+        XCTAssertEqual(Skan.maxCoarse(.low, previous: 2), .high)
+        XCTAssertEqual(Skan.maxCoarse(.low, previous: 1), .medium)
+        XCTAssertEqual(Skan.maxCoarse(.high, previous: 1), .high)
+        XCTAssertEqual(Skan.maxCoarse(.medium, previous: -1), .medium)
+    }
+
     func testParseServerSchema() {
         let json = #"{"skan":{"rules":[{"event":"sign_up","fine":10,"coarse":"low"},{"event":"purchase","fine":70,"coarse":"high","minRevenue":5},{"fine":3}]}}"#
         let parsed = Skan.parse(Data(json.utf8))

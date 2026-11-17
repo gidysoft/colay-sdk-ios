@@ -3,6 +3,13 @@
 All notable changes to this project are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning: [SemVer](https://semver.org/).
 
+## [0.1.4] - 2026-11-17
+
+### Fixed
+- The SKAdNetwork schema is fetched asynchronously, so tracking calls never wait for the network; after a failed fetch
+  the SDK waits an hour before retrying instead of retrying on every app open.
+- The coarse conversion value never decreases within a measurement window (later windows report only the coarse value).
+
 ## [0.1.3] - 2026-11-17
 
 ### Added

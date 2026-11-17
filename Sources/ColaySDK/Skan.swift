@@ -52,6 +52,16 @@ enum Skan {
             .max { $0.fine < $1.fine }
     }
 
+    static func rank(_ c: ColayCoarseValue) -> Int {
+        switch c { case .low: return 0; case .medium: return 1; case .high: return 2 }
+    }
+
+    /// The higher of the rule's coarse value and the one already set in this window (rank -1 = none yet).
+    static func maxCoarse(_ c: ColayCoarseValue, previous: Int) -> ColayCoarseValue {
+        if previous >= 2 || (previous == 1 && c == .low) { return previous == 2 ? .high : .medium }
+        return c
+    }
+
     static func parse(_ data: Data) -> [SkanRule]? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let skan = root["skan"] as? [String: Any],

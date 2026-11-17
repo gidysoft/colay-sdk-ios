@@ -44,11 +44,11 @@
 
 ## Installation
 
-Xcode → File → **Add Package Dependencies…** → `https://github.com/gidysoft/colay-sdk-ios` → Up to Next Major `0.1.3`.
+Xcode → File → **Add Package Dependencies…** → `https://github.com/gidysoft/colay-sdk-ios` → Up to Next Major `0.1.4`.
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/gidysoft/colay-sdk-ios", from: "0.1.3")
+.package(url: "https://github.com/gidysoft/colay-sdk-ios", from: "0.1.4")
 ```
 
 ## Quick start
